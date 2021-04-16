@@ -1,2 +1,2 @@
-# gao
+# .gao
 The Gao programming language
