@@ -1,0 +1,15 @@
+let x = 10;
+let x1: int = 10;
+let b: bool = true;
+
+fn main(): int {
+    foo();
+    return 1;
+}
+
+fn foo(arg1: int, arg2: bool): bool {
+    return false;
+}
+
+fn bar() {   
+}

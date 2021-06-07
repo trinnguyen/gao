@@ -1,0 +1,5 @@
+let x = 10;
+let x1: int = 001;
+
+fn bar() {   
+}
