@@ -19,4 +19,10 @@ fn main() {
     let mut parser = Parser::new(lexer);
     let ast = parser.parse();
     println!("{:?}", ast);
+
+    // gen
+    let context = Context::create();
+    let gen = LlvmGen::new(ast, &&context);
+    let val = gen.build();
+    println!("{}", val)
 }
