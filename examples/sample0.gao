@@ -1,5 +1,12 @@
 let x = 10;
 let x1: int = 001;
 
-fn bar() {   
+fn main(): int {   
+    1;
+    true;
+    return 1;
+}
+
+fn foo(): bool {
+    return true;
 }

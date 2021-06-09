@@ -1,21 +1,22 @@
-use crate::lexer::Lexer;
-use crate::token::Tok;
-use crate::token::TokType;
+use inkwell::context::Context;
+use parser::Parser;
+
+use crate::{gen::LlvmGen, lexer::Lexer};
 
 mod lexer;
 mod ast;
 mod token;
 mod parser;
+mod gen;
 
 fn main() {
+    env_logger::init();
     let path = std::env::args().skip(1).next().unwrap();
     let content = std::fs::read_to_string(path).unwrap();
     let lexer = Lexer::new(&content);
 
-    // debug
-    let toks: Vec<Tok> = lexer.collect();
-    println!("{:?}", toks);
-
-    let typs: Vec<TokType> = toks.iter().map(|tok| tok.typ.clone()).collect();
-    println!("{:?}", typs)
+    // parse
+    let mut parser = Parser::new(lexer);
+    let ast = parser.parse();
+    println!("{:?}", ast);
 }

@@ -1,3 +1,6 @@
+use log::debug;
+
+use crate::token::Location;
 use crate::token::{Tok, TokType};
 use std::str::Chars;
 use std::iter::Peekable;
@@ -34,11 +37,9 @@ impl<'a> Lexer<'a> {
                     t if t.is_ascii_digit() => self.scan_int_const(t),
                     t => panic!("unexpected char: {} at {}", t, self.location())
                 };
-                Some(Tok {
-                    typ,
-                    line: self.line,
-                    col: self.tok_col
-                })
+                let tok = Tok(typ, Location(self.line, self.tok_col));
+                debug!("-> {:?}", tok);
+                Some(tok)
             },
             None => None
         }
@@ -84,13 +85,13 @@ impl<'a> Lexer<'a> {
         // next is letter or digit
         while let Some(c) = self.str.peek() {
             match c {
-                t if *t == 'c' || t.is_ascii_alphanumeric() => str.push(self.next_char().unwrap()),
+                t if *t == '_' || t.is_ascii_alphanumeric() => str.push(self.next_char().unwrap()),
                 _ => break
             }
         }
 
         // check str
-        return match str.as_ref() {
+        return match str.as_str() {
             "fn" => TokType::KwFn,
             "int" => TokType::KwInt,
             "bool" => TokType::KwBool,
@@ -99,7 +100,7 @@ impl<'a> Lexer<'a> {
             "return" => TokType::KwReturn,
             "true" => TokType::KwTrue,
             "false" => TokType::KwFalse,
-            _ => TokType::Id(str)
+            _ => TokType::Iden(str)
         }
     }
 

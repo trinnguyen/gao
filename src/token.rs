@@ -1,11 +1,18 @@
-#[derive(Debug, Clone)]
-pub struct Tok {
-    pub typ: TokType,
-    pub line: usize,
-    pub col: usize
-}
+use std::{fmt::Display, usize};
 
 #[derive(Debug, Clone)]
+pub struct Tok(pub TokType, pub Location);
+
+impl Tok {
+    pub fn is_typ(&self, typ: &TokType) -> bool {
+        return self.0 == *typ;
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Location(pub usize, pub usize);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokType {
     // keyword
     KwFn,
@@ -28,6 +35,44 @@ pub enum TokType {
     Assign,
 
     // id/const
-    Id(String),
+    Iden(String),
     IntConst(u32),
+}
+
+impl Display for Tok {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} at {}", self.0, self.1)
+    }
+}
+
+impl Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.0, self.1)
+    }
+}
+
+impl Display for TokType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str: &str = match self {
+            TokType::KwFn => "fn",
+            TokType::KwInt => "int",
+            TokType::KwBool => "bool",
+            TokType::KwLet => "let",
+            TokType::KwVar => "var",
+            TokType::KwReturn => "return",
+            TokType::KwTrue => "true",
+            TokType::KwFalse => "false",
+            TokType::OpenParent => "(",
+            TokType::CloseParent => ")",
+            TokType::OpenBracket => "{",
+            TokType::CloseBracket => "}",
+            TokType::Comma => ",",
+            TokType::SemiColon => ";",
+            TokType::Colon => ":",
+            TokType::Assign => "=",
+            TokType::Iden(id) => id,
+            TokType::IntConst(num) => return write!(f, "{}", num)
+        };
+        write!(f, "{}", str)
+    }
 }

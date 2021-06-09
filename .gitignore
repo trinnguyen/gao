@@ -12,3 +12,5 @@ Cargo.lock
 **/.antlr
 
 **/.idea
+
+.samples

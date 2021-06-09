@@ -1,34 +1,35 @@
+use crate::token::Location;
+
 #[derive(Debug)]
 pub struct Ast {
-    var_decls: Vec<VarDecl>,
-    func_decls: Vec<FunctionDecl>
+    pub var_decls: Vec<VarDecl>,
+    pub func_decls: Vec<FunctionDecl>
 }
 
 #[derive(Debug)]
 pub struct VarDecl {
-    prefix: VarPrefix,
-    name: String,
-    data_type: DataType
+    pub prefix: VarPrefix,
+    pub name: Id,
+    pub data_type: Option<DataType>,
+    pub init_value: Expr
 }
 
 #[derive(Debug)]
 pub enum VarPrefix {
-    Let,
-    Var
+    Let(Location),
+    Var(Location)
 }
 
 #[derive(Debug)]
 pub struct FunctionDecl {
-    name: String,
-    params: Vec<FuncParam>,
-    return_type: FunctionType,
-    stmt: CmpStmt
+    pub name: Id,
+    pub params: Vec<FuncParam>,
+    pub return_type: FunctionType,
+    pub stmt: CmpStmt
 }
 
 #[derive(Debug)]
-pub struct CmpStmt {
-    stmts: Vec<Stmt>
-}
+pub struct CmpStmt(pub Vec<Stmt>, pub Location);
 
 #[derive(Debug)]
 pub enum Stmt {
@@ -39,28 +40,30 @@ pub enum Stmt {
 #[derive(Debug)]
 pub enum Expr {
     LiteralExpr(Literal),
-    VarRefExpr(Box<VarDecl>),
-    ParamRefExpr(Box<FuncParam>),
-    FuncCallExpr
+    VarRefExpr(Id),
+    FuncCallExpr(Id, Vec<Expr>)
 }
 
 #[derive(Debug)]
 pub enum Literal {
-    Int(i32),
-    Bool(bool)
+    Int(u32, Location),
+    Bool(bool, Location)
 }
 
 #[derive(Debug)]
 pub struct FuncParam {
-    name: String,
-    data_type: DataType
+    pub name: Id,
+    pub data_type: DataType
 }
 
 #[derive(Debug)]
 pub enum DataType {
-    Int,
-    Bool
+    Int(Location),
+    Bool(Location)
 }
+
+#[derive(Debug)]
+pub struct Id(pub String, pub Location);
 
 #[derive(Debug)]
 pub enum FunctionType {

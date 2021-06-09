@@ -6,9 +6,9 @@ decl: varDecl | functionDecl;
 
 varDecl: varPrefix (':' data_type)? '=' expr;
 
-functionDecl: 'fn' Id '(' (funcArg (',' funcArg)* )? ')' ':' data_type cmpStmt;
+functionDecl: 'fn' Id '(' (funcParam (',' funcParam)* )? ')' (':' data_type)? cmpStmt;
 
-funcArg: Id ':' data_type;
+funcParam: Id ':' data_type;
 
 cmpStmt: '{' stmt* '}';
 
