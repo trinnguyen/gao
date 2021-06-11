@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::token::Location;
 
 #[derive(Debug)]
@@ -33,15 +35,24 @@ pub struct CmpStmt(pub Vec<Stmt>, pub Location);
 
 #[derive(Debug)]
 pub enum Stmt {
-    ExprStmt(Expr),
-    ReturnStmt(Option<Expr>)
+    FuncCallStmt(FuncCallExpr),
+    ReturnStmt(Option<Expr>),
+    VarDeclStmt(VarDecl),
+    AssignStmt(Id, Expr)
+    // IfElseStmt(Expr, CmpStmt, Option<CmpStmt>)
 }
 
 #[derive(Debug)]
 pub enum Expr {
     LiteralExpr(Literal),
     VarRefExpr(Id),
-    FuncCallExpr(Id, Vec<Expr>)
+    FuncCall(FuncCallExpr)
+}
+
+#[derive(Debug)]
+pub struct FuncCallExpr {
+    pub name: Id,
+    pub args: Vec<Expr>
 }
 
 #[derive(Debug)]
@@ -64,6 +75,12 @@ pub enum DataType {
 
 #[derive(Debug)]
 pub struct Id(pub String, pub Location);
+
+impl Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} at {}", self.0, self.1)
+    }
+}
 
 #[derive(Debug)]
 pub enum FunctionType {

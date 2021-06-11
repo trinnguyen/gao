@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use inkwell::context::Context;
 use parser::Parser;
 
@@ -11,7 +13,8 @@ mod gen;
 
 fn main() {
     env_logger::init();
-    let path = std::env::args().skip(1).next().unwrap();
+    let file = std::env::args().skip(1).next().unwrap();
+    let path = Path::new(&file);
     let content = std::fs::read_to_string(path).unwrap();
     let lexer = Lexer::new(&content);
 
@@ -22,7 +25,11 @@ fn main() {
 
     // gen
     let context = Context::create();
-    let gen = LlvmGen::new(ast, &&context);
+    let mut gen = LlvmGen::new(&ast, &context);
     let val = gen.build();
-    println!("{}", val)
+
+    // lli
+    println!("{}", val);
+    let ll_path = path.with_extension("ll");
+    std::fs::write(&ll_path, val).unwrap();
 }

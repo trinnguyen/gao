@@ -4,7 +4,7 @@ pr: decl+;
 
 decl: varDecl | functionDecl;
 
-varDecl: varPrefix (':' data_type)? '=' expr;
+varDecl: varPrefix (':' data_type)? '=' expr ';';
 
 functionDecl: 'fn' Id '(' (funcParam (',' funcParam)* )? ')' (':' data_type)? cmpStmt;
 
@@ -12,11 +12,15 @@ funcParam: Id ':' data_type;
 
 cmpStmt: '{' stmt* '}';
 
-stmt: exprStmt | returnStmt;
+stmt: functionCallStmt | returnStmt | varDeclStmt | assignStmt;
 
-exprStmt: expr ';';
+functionCallStmt: funcCallExpr ';';
 
 returnStmt: 'return' expr? ';';
+
+varDeclStmt: varDecl;
+
+assignStmt: Id '=' expr ';';
 
 varPrefix: 'let' | 'var';
 

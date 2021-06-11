@@ -1,5 +1,5 @@
 use log::{debug};
-use crate::{ast::{Ast, CmpStmt, DataType, Expr, FuncParam, FunctionDecl, FunctionType, Id, Literal, Stmt, VarDecl, VarPrefix}, lexer::Lexer, token::Tok, token::TokType};
+use crate::{ast::{Ast, CmpStmt, DataType, Expr, FuncCallExpr, FuncParam, FunctionDecl, FunctionType, Id, Literal, Stmt, VarDecl, VarPrefix}, lexer::Lexer, token::Tok, token::TokType};
 use std::iter::Peekable;
 
 pub struct Parser<'a> {
@@ -93,12 +93,12 @@ impl <'a> Parser<'a> {
     }
 
     fn is_peek_stmt(&mut self) -> bool {
-        if let Some(Tok(TokType::KwReturn, _)) = self.lexer.peek() {
-            return true;
-        }
-
-        if self.is_peek_expr() {
-            return true;
+        
+        if let Some(typ) = self.peek_typ() {
+            return match typ {
+                TokType::KwReturn | TokType::KwLet | TokType::KwVar => true,
+                _ => self.is_peek_expr()
+            }
         }
 
         return false;
@@ -107,21 +107,55 @@ impl <'a> Parser<'a> {
     fn parse_stmt(&mut self) -> Stmt {
 
         // return stmt
-        if let Some(Tok(TokType::KwReturn, _)) = self.lexer.peek() {
-            self.consume(TokType::KwReturn);
-            let expr: Option<Expr> = if self.is_peek_expr() {    
-                Some(self.parse_expr())
-            } else {
-                None
-            };
-            self.consume(TokType::SemiColon);
-            return Stmt::ReturnStmt(expr);
-        }
+        if let Some(tok) =  self.lexer.peek() {
+            match tok.0 {
+                TokType::KwReturn => {
+                    self.consume(TokType::KwReturn);
+                    let expr: Option<Expr> = if self.is_peek_expr() {    
+                        Some(self.parse_expr())
+                    } else {
+                        None
+                    };
+                    self.consume(TokType::SemiColon);
+                    return Stmt::ReturnStmt(expr);
+                },
+                TokType::KwLet | TokType::KwVar => {
+                    let decl = self.parse_var();
+                    return Stmt::VarDeclStmt(decl);
+                },
 
-        // expr stmt
-        let expr = self.parse_expr();
-        self.consume(TokType::SemiColon);
-        return Stmt::ExprStmt(expr);
+                // parse func call or variable assign
+                TokType::Iden(_) => {
+                    // assign or func call
+                    let id = self.parse_id();
+
+                    // check if open or assign
+                    match self.peek_typ() {
+                        Some(TokType::Assign) => {
+                            // parse assign statement
+                            self.consume(TokType::Assign);
+                            let expr = self.parse_expr();
+                            self.consume(TokType::SemiColon);
+                            return Stmt::AssignStmt(id, expr);
+                        },
+                        Some(TokType::OpenParent) => {
+                            // parse function call
+                            let stmt = Stmt::FuncCallStmt(self.parse_func_call(id));
+                            self.consume(TokType::SemiColon);
+                            return stmt;
+                        },
+                        _ => panic!("expected ( or = but actual: {:?}", self.lexer.peek())
+                    }
+                },
+                _ => panic!("unexpected token: {}", tok)
+            }
+        }
+        
+        panic!("unexpected EOF")
+    }
+
+    fn peek_typ(&mut self) -> Option<&TokType> {
+        return self.lexer.peek().map(|tok| &tok.0);
     }
 
     fn is_peek_expr(&mut self) -> bool {
@@ -138,34 +172,17 @@ impl <'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Expr {
-        if let Some(Tok(typ, _)) = self.lexer.peek() {
-            match typ {
+        if let Some(tok) = self.lexer.peek() {
+            match tok.0 {
                 TokType::Iden(_) => {
-                    let name = self.parse_id();
-                    if let Some(Tok(TokType::OpenParent, _)) = self.lexer.peek() {
-                        debug!("parse function call");
+                    let id = self.parse_id();
+                    if let Some(TokType::OpenParent) = self.peek_typ() {
                         // parse func call
-                        self.consume(TokType::OpenParent);
-
-                        // args
-                        let mut args: Vec<Expr> = Vec::new();
-                        if self.is_peek_expr() {
-                            args.push(self.parse_expr());
-                            while let Some(Tok(TokType::Comma, _)) = self.lexer.peek() {
-                                self.consume(TokType::Comma);
-                                args.push(self.parse_expr());
-                            }
-                        }
-
-                        // close
-                        self.consume(TokType::CloseParent);
-
-                        // return
-                        return Expr::FuncCallExpr(name, args)
+                        return Expr::FuncCall(self.parse_func_call(id));
                     } else {
                         debug!("parse var ref");
                         // variable/param ref
-                        return Expr::VarRefExpr(name)
+                        return Expr::VarRefExpr(id)
                     }
                 },
                 TokType::IntConst(_) => {
@@ -187,11 +204,33 @@ impl <'a> Parser<'a> {
                         _ => panic!("unexpected EOF")
                     }
                 },
-                t => panic!("expected expr but {}", t)
+                _ => panic!("expected expr but {}", tok)
             }
         } else {
             panic!("unexpected EOF")
         }
+    }
+
+    fn parse_func_call(&mut self, id: Id) -> FuncCallExpr {
+
+        self.consume(TokType::OpenParent);
+
+        // argument
+        let mut args = Vec::<Expr>::new();
+        if self.is_peek_expr() {
+            args.push(self.parse_expr());
+            while let Some(Tok(TokType::Comma, _)) = self.lexer.peek() {
+                self.consume_any();
+                args.push(self.parse_expr());
+            }
+        }
+
+        self.consume(TokType::CloseParent);
+
+        return FuncCallExpr {
+            name: id,
+            args
+        };
     }
 
     fn parse_var(&mut self) -> VarDecl {
@@ -271,5 +310,9 @@ impl <'a> Parser<'a> {
             Some(_) => {},
             None => panic!("unexpected EOF")
         }
+    }
+
+    fn consume_any(&mut self) {
+        let _ = self.lexer.next();
     }
 }

@@ -23,6 +23,8 @@ pub enum TokType {
     KwReturn,
     KwTrue,
     KwFalse,
+    KwIf,
+    KwElse,
 
     // symbols
     OpenParent,
@@ -62,6 +64,8 @@ impl Display for TokType {
             TokType::KwReturn => "return",
             TokType::KwTrue => "true",
             TokType::KwFalse => "false",
+            TokType::KwIf => "if",
+            TokType::KwElse => "else",
             TokType::OpenParent => "(",
             TokType::CloseParent => ")",
             TokType::OpenBracket => "{",
