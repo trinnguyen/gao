@@ -9,7 +9,7 @@ impl Tok {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Location(pub usize, pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq)]

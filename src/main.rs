@@ -15,12 +15,13 @@ fn main() {
     env_logger::init();
     let file = std::env::args().skip(1).next().unwrap();
     let path = Path::new(&file);
+    let name= path.file_name().unwrap().to_str().unwrap();
     let content = std::fs::read_to_string(path).unwrap();
     let lexer = Lexer::new(&content);
 
     // parse
     let mut parser = Parser::new(lexer);
-    let ast = parser.parse();
+    let ast = parser.parse(name.to_string());
     println!("{:?}", ast);
 
     // gen

@@ -46,16 +46,12 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_whitespace_line(&mut self) {
-        loop {
-            if let Some(c) = self.str.peek() {
-                match c {
-                    '\t' | '\n' | ' ' => {
-                        self.next_char();
-                    },
-                    _ => break
-                }
-            } else {
-                break
+        while let Some(c) = self.str.peek() {
+            match c {
+                '\t' | '\n' | ' ' => {
+                    self.next_char();
+                },
+                _ => break
             }
         }
     }
@@ -100,6 +96,8 @@ impl<'a> Lexer<'a> {
             "return" => TokType::KwReturn,
             "true" => TokType::KwTrue,
             "false" => TokType::KwFalse,
+            "if" => TokType::KwIf,
+            "else" => TokType::KwElse,
             _ => TokType::Iden(str)
         }
     }
@@ -115,7 +113,7 @@ impl<'a> Lexer<'a> {
         }
 
         // parse
-        return TokType::IntConst(str.parse().unwrap())
+        TokType::IntConst(str.parse().unwrap())
     }
 
     fn location(&self) -> String {
@@ -140,5 +138,133 @@ impl <'a> Iterator for Lexer<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::lexer::Lexer;
+    use crate::token::TokType;
+
+    #[test]
+    fn test_main() {
+        let lexer = Lexer::new("fn main(): int { return 1; }");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::KwFn,
+            TokType::Iden("main".to_string()),
+            TokType::OpenParent,
+            TokType::CloseParent,
+            TokType::Colon,
+            TokType::KwInt,
+            TokType::OpenBracket,
+            TokType::KwReturn,
+            TokType::IntConst(1),
+            TokType::SemiColon,
+            TokType::CloseBracket,
+        ];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_params() {
+        let lexer = Lexer::new("fn foo(x_1: int, y2: bool) {}");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::KwFn,
+            TokType::Iden("foo".to_string()),
+            TokType::OpenParent,
+            TokType::Iden("x_1".to_string()),
+            TokType::Colon,
+            TokType::KwInt,
+            TokType::Comma,
+            TokType::Iden("y2".to_string()),
+            TokType::Colon,
+            TokType::KwBool,
+            TokType::CloseParent,
+            TokType::OpenBracket,
+            TokType::CloseBracket,
+        ];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_stmts() {
+        let lexer = Lexer::new("fn bar_2() { let x: int = 100; let y: bool = false; x = 987; }");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::KwFn,
+            TokType::Iden("bar_2".to_string()),
+            TokType::OpenParent,
+            TokType::CloseParent,
+            TokType::OpenBracket,
+
+            TokType::KwLet,
+            TokType::Iden("x".to_string()),
+            TokType::Colon,
+            TokType::KwInt,
+            TokType::Assign,
+            TokType::IntConst(100),
+            TokType::SemiColon,
+
+            TokType::KwLet,
+            TokType::Iden("y".to_string()),
+            TokType::Colon,
+            TokType::KwBool,
+            TokType::Assign,
+            TokType::KwFalse,
+            TokType::SemiColon,
+
+            TokType::Iden("x".to_string()),
+            TokType::Assign,
+            TokType::IntConst(987),
+            TokType::SemiColon,
+            TokType::CloseBracket,
+        ];
+
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_if_else() {
+        let lexer = Lexer::new("fn t() { if true {} else {} }");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::KwFn,
+            TokType::Iden("t".to_string()),
+            TokType::OpenParent,
+            TokType::CloseParent,
+            TokType::OpenBracket,
+            TokType::KwIf,
+            TokType::KwTrue,
+            TokType::OpenBracket,
+            TokType::CloseBracket,
+            TokType::KwElse,
+            TokType::OpenBracket,
+            TokType::CloseBracket,
+            TokType::CloseBracket
+        ];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_digit_letter() {
+        let lexer = Lexer::new("12main");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::IntConst(12),
+            TokType::Iden("main".to_string()),
+        ];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_letter_digit() {
+        let lexer = Lexer::new("main12");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::Iden("main12".to_string()),
+        ];
+        assert_eq!(actual, expected)
     }
 }

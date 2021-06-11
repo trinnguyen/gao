@@ -8,12 +8,12 @@ pub struct Parser<'a> {
 
 impl <'a> Parser<'a> {
     pub fn new(lexer: Lexer<'a>) -> Self {
-        return Parser {
+        Parser {
             lexer: lexer.peekable()
-        };
+        }
     }
 
-    pub fn parse(&mut self) -> Ast {
+    pub fn parse(&mut self, name: String) -> Ast {
         let mut var_decls: Vec<VarDecl> = Vec::new();
         let mut func_decls: Vec<FunctionDecl> = Vec::new();
 
@@ -32,6 +32,7 @@ impl <'a> Parser<'a> {
 
         // return
         Ast {
+            name,
             var_decls,
             func_decls
         }
@@ -47,7 +48,7 @@ impl <'a> Parser<'a> {
 
         // parse params
         let mut params: Vec<FuncParam> = Vec::new();
-        if self.is_peek_id() {
+        if self.check_peek_id() {
             params.push(self.parse_param());
 
             // next
@@ -71,12 +72,12 @@ impl <'a> Parser<'a> {
         // cmp stmt
         let stmt = self.parse_cmp_stmt();
 
-        return FunctionDecl {
+        FunctionDecl {
             name,
             params,
             return_type,
             stmt
-        };
+        }
     }
 
     fn parse_cmp_stmt(&mut self) -> CmpStmt {
@@ -84,24 +85,24 @@ impl <'a> Parser<'a> {
         self.consume(TokType::OpenBracket);
         
         let mut stmts: Vec<Stmt> = Vec::new();
-        while self.is_peek_stmt() {
+        while self.check_peek_stmt() {
             stmts.push(self.parse_stmt());
         }
 
         self.consume(TokType::CloseBracket);
-        return CmpStmt(stmts, loc);
+        CmpStmt(stmts, loc)
     }
 
-    fn is_peek_stmt(&mut self) -> bool {
+    fn check_peek_stmt(&mut self) -> bool {
         
         if let Some(typ) = self.peek_typ() {
             return match typ {
-                TokType::KwReturn | TokType::KwLet | TokType::KwVar => true,
-                _ => self.is_peek_expr()
+                TokType::KwReturn | TokType::KwLet | TokType::KwVar | TokType::KwIf => true,
+                _ => self.check_peek_expr()
             }
         }
 
-        return false;
+        false
     }
 
     fn parse_stmt(&mut self) -> Stmt {
@@ -111,7 +112,7 @@ impl <'a> Parser<'a> {
             match tok.0 {
                 TokType::KwReturn => {
                     self.consume(TokType::KwReturn);
-                    let expr: Option<Expr> = if self.is_peek_expr() {    
+                    let expr: Option<Expr> = if self.check_peek_expr() {
                         Some(self.parse_expr())
                     } else {
                         None
@@ -123,6 +124,24 @@ impl <'a> Parser<'a> {
                     let decl = self.parse_var();
                     return Stmt::VarDeclStmt(decl);
                 },
+
+                // if - else statement
+                TokType::KwIf => {
+                    // parse condition
+                    let cond = self.parse_expr();
+
+                    // parse else part
+                    let body = self.parse_cmp_stmt();
+
+                    // optional else part
+                    let else_stmt: Option<CmpStmt> = if let Some(TokType::KwElse) = self.peek_typ() {
+                        Some(self.parse_cmp_stmt())
+                    } else {
+                        None
+                    };
+
+                    return Stmt::IfElseStmt(cond, body, else_stmt)
+                }
 
                 // parse func call or variable assign
                 TokType::Iden(_) => {
@@ -154,18 +173,9 @@ impl <'a> Parser<'a> {
         panic!("unexpected EOF")
     }
 
-    fn peek_typ(&mut self) -> Option<&TokType> {
-        return self.lexer.peek().map(|tok| &tok.0);
-    }
-
-    fn is_peek_expr(&mut self) -> bool {
+    fn check_peek_expr(&mut self) -> bool {
         if let Some(Tok(typ, _)) = self.lexer.peek() {
-            match typ {
-                TokType::Iden(_) => true,
-                TokType::IntConst(_) => true,
-                TokType::KwTrue | TokType::KwFalse => true,
-                _ => false
-            }
+            matches!(typ, TokType::Iden(_) | TokType::IntConst(_) | TokType::KwTrue | TokType::KwFalse)
         } else {
             false
         }
@@ -178,17 +188,17 @@ impl <'a> Parser<'a> {
                     let id = self.parse_id();
                     if let Some(TokType::OpenParent) = self.peek_typ() {
                         // parse func call
-                        return Expr::FuncCall(self.parse_func_call(id));
+                        Expr::FuncCall(self.parse_func_call(id))
                     } else {
                         debug!("parse var ref");
                         // variable/param ref
-                        return Expr::VarRefExpr(id)
+                        Expr::VarRefExpr(id)
                     }
                 },
                 TokType::IntConst(_) => {
                     debug!("parse int const");
                     match self.lexer.next() {
-                        Some(Tok(TokType::IntConst(val), loc)) => return Expr::LiteralExpr(Literal::Int(val, loc)),
+                        Some(Tok(TokType::IntConst(val), loc)) => Expr::LiteralExpr(Literal::Int(val, loc)),
                         Some(t) => panic!("expected number but {}", t),
                         _ => panic!("unexpected EOF")
                     }
@@ -197,8 +207,8 @@ impl <'a> Parser<'a> {
                     debug!("parse bool const");
                     match self.lexer.next() {
                         Some(tok) => match tok {
-                            Tok(TokType::KwTrue, loc) => return Expr::LiteralExpr(Literal::Bool(true, loc)),
-                            Tok(TokType::KwFalse, loc) => return Expr::LiteralExpr(Literal::Bool(false, loc)),
+                            Tok(TokType::KwTrue, loc) => Expr::LiteralExpr(Literal::Bool(true, loc)),
+                            Tok(TokType::KwFalse, loc) => Expr::LiteralExpr(Literal::Bool(false, loc)),
                             t => panic!("expected bool constant but {:?}", t)
                         }
                         _ => panic!("unexpected EOF")
@@ -217,7 +227,7 @@ impl <'a> Parser<'a> {
 
         // argument
         let mut args = Vec::<Expr>::new();
-        if self.is_peek_expr() {
+        if self.check_peek_expr() {
             args.push(self.parse_expr());
             while let Some(Tok(TokType::Comma, _)) = self.lexer.peek() {
                 self.consume_any();
@@ -227,10 +237,10 @@ impl <'a> Parser<'a> {
 
         self.consume(TokType::CloseParent);
 
-        return FuncCallExpr {
+        FuncCallExpr {
             name: id,
             args
-        };
+        }
     }
 
     fn parse_var(&mut self) -> VarDecl {
@@ -269,11 +279,8 @@ impl <'a> Parser<'a> {
         }
     }
 
-    fn is_peek_id(&mut self) -> bool {
-        match self.lexer.peek() {
-            Some(Tok(TokType::Iden(_), _)) => return true,
-            _ => return false
-        }
+    fn check_peek_id(&mut self) -> bool {
+        return matches!(self.lexer.peek(), Some(Tok(TokType::Iden(_), _)))
     }
 
     fn parse_param(&mut self) -> FuncParam {
@@ -289,7 +296,7 @@ impl <'a> Parser<'a> {
     fn parse_id(&mut self) -> Id {
         match self.lexer.next().unwrap() {
             Tok(TokType::Iden(id), loc) => {
-                return Id(id, loc)
+                Id(id, loc)
             },
             t => panic!("expected Id but {}", t)
         }
@@ -314,5 +321,49 @@ impl <'a> Parser<'a> {
 
     fn consume_any(&mut self) {
         let _ = self.lexer.next();
+    }
+
+    fn peek_typ(&mut self) -> Option<&TokType> {
+        return self.lexer.peek().map(|tok| &tok.0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::Parser;
+    use crate::lexer::Lexer;
+    use crate::ast::*;
+    use crate::token::Location;
+
+    fn parse(str: &str) -> Ast {
+        let lexer = Lexer::new(str);
+        Parser::new(lexer).parse("test".to_string())
+    }
+
+    #[test]
+    fn test_name() {
+        let ast = parse("fn main(): int { return 1; }");
+        assert_eq!(ast.name, "test")
+    }
+
+    #[test]
+    fn test_main() {
+        let ast = parse("fn main(): int { return 10; }");
+        assert_eq!(ast.func_decls.len(), 1);
+        assert_eq!(ast.var_decls.len(), 0);
+
+        // fun
+        let main = ast.func_decls.first().unwrap();
+        assert_eq!(main.name, Id("main".to_string(), Location(1, 4)));
+        assert_eq!(main.params.len(), 0);
+        assert_eq!(main.return_type, FunctionType::Data(DataType::Int(Location(1, 12))));
+
+        // body
+        let vec = &main.stmt.0;
+        assert_eq!(vec.len(), 1);
+        match vec.first().unwrap() {
+            Stmt::ReturnStmt(Some(Expr::LiteralExpr(Literal::Int(10, Location(1, 25))))) => {},
+            t => panic!("unexpected stmt: {:?}", t)
+        }
     }
 }

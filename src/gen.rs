@@ -24,8 +24,7 @@ pub struct LlvmGen<'a> {
 impl<'a> LlvmGen<'a> {
     pub fn new(ast: &'a Ast, ctx: &'a Context) -> Self {
         let builder = ctx.create_builder();
-        let module = ctx.create_module("default");
-
+        let module = ctx.create_module(&ast.name);
         LlvmGen {
             ast,
             ctx,
@@ -124,6 +123,7 @@ impl<'a> LlvmGen<'a> {
                 Stmt::FuncCallStmt(expr) => {
                     self.gen_func_call(expr);
                 }
+
                 Stmt::ReturnStmt(opt_expr) => {
                     if let Some(expr) = opt_expr {
                         let val = self.gen_expr(expr);
@@ -132,6 +132,7 @@ impl<'a> LlvmGen<'a> {
 
                     return;
                 }
+
                 Stmt::VarDeclStmt(decl) => {
                     if let Some(dt) = &decl.data_type {
                         let typ = self.gen_data_type(dt);
@@ -145,7 +146,10 @@ impl<'a> LlvmGen<'a> {
                         panic!("missing data type")
                     }
                 }
+
                 Stmt::AssignStmt(id, expr) => self.gen_assign(&id.0, expr),
+
+                Stmt::IfElseStmt(cond, then_stmt, opt_else) => {}
             }
         }
 

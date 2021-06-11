@@ -1,0 +1,10 @@
+fn main(): int {
+    let x: int = 99;
+    if true {
+        x = 21;
+    } else {
+        x = 22;
+    }
+
+    return x;
+}

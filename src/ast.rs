@@ -4,6 +4,7 @@ use crate::token::Location;
 
 #[derive(Debug)]
 pub struct Ast {
+    pub name: String,
     pub var_decls: Vec<VarDecl>,
     pub func_decls: Vec<FunctionDecl>
 }
@@ -38,8 +39,10 @@ pub enum Stmt {
     FuncCallStmt(FuncCallExpr),
     ReturnStmt(Option<Expr>),
     VarDeclStmt(VarDecl),
-    AssignStmt(Id, Expr)
-    // IfElseStmt(Expr, CmpStmt, Option<CmpStmt>)
+    AssignStmt(Id, Expr),
+
+    // cond, then-part, optional else-part
+    IfElseStmt(Expr, CmpStmt, Option<CmpStmt>)
 }
 
 #[derive(Debug)]
@@ -67,13 +70,13 @@ pub struct FuncParam {
     pub data_type: DataType
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, PartialEq)]
 pub enum DataType {
     Int(Location),
     Bool(Location)
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, PartialEq)]
 pub struct Id(pub String, pub Location);
 
 impl Display for Id {
@@ -82,7 +85,7 @@ impl Display for Id {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, PartialEq)]
 pub enum FunctionType {
     Void,
     Data(DataType)
