@@ -13,7 +13,7 @@ pub struct Ast {
 pub struct VarDecl {
     pub prefix: VarPrefix,
     pub name: Id,
-    pub data_type: Option<DataType>,
+    pub data_type: Option<DataTypeLoc>,
     pub init_value: Expr
 }
 
@@ -27,7 +27,7 @@ pub enum VarPrefix {
 pub struct FunctionDecl {
     pub name: Id,
     pub params: Vec<FuncParam>,
-    pub return_type: FunctionType,
+    pub return_type: DataTypeLoc,
     pub stmt: CmpStmt
 }
 
@@ -36,26 +36,25 @@ pub struct CmpStmt(pub Vec<Stmt>, pub Location);
 
 #[derive(Debug)]
 pub enum Stmt {
-    FuncCallStmt(FuncCallExpr),
+    // return an expr or empty
     ReturnStmt(Option<Expr>),
+
+    // local variable declaration
     VarDeclStmt(VarDecl),
-    AssignStmt(Id, Expr),
 
     // cond, then-part, optional else-part
-    IfElseStmt(Expr, CmpStmt, Option<CmpStmt>)
+    IfElseStmt(Expr, CmpStmt, Option<CmpStmt>),
+
+    // expr
+    Expr(Expr)
 }
 
 #[derive(Debug)]
 pub enum Expr {
-    LiteralExpr(Literal),
-    VarRefExpr(Id),
-    FuncCall(FuncCallExpr)
-}
-
-#[derive(Debug)]
-pub struct FuncCallExpr {
-    pub name: Id,
-    pub args: Vec<Expr>
+    Literal(Literal),
+    VarRef(Id),
+    Assign(Id, Box<Expr>),
+    FuncCall(Id, Vec<Expr>)
 }
 
 #[derive(Debug)]
@@ -67,13 +66,7 @@ pub enum Literal {
 #[derive(Debug)]
 pub struct FuncParam {
     pub name: Id,
-    pub data_type: DataType
-}
-
-#[derive(Debug, PartialOrd, PartialEq)]
-pub enum DataType {
-    Int(Location),
-    Bool(Location)
+    pub data_type: DataTypeLoc
 }
 
 #[derive(Debug, PartialOrd, PartialEq)]
@@ -86,7 +79,11 @@ impl Display for Id {
 }
 
 #[derive(Debug, PartialOrd, PartialEq)]
-pub enum FunctionType {
-    Void,
-    Data(DataType)
+pub struct DataTypeLoc(pub DataType, pub Location);
+
+#[derive(Debug, PartialOrd, PartialEq)]
+pub enum DataType {
+    Int,
+    Bool,
+    Void
 }

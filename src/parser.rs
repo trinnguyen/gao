@@ -1,6 +1,8 @@
 use log::{debug};
-use crate::{ast::{Ast, CmpStmt, DataType, Expr, FuncCallExpr, FuncParam, FunctionDecl, FunctionType, Id, Literal, Stmt, VarDecl, VarPrefix}, lexer::Lexer, token::Tok, token::TokType};
+use crate::{ast::{Ast, CmpStmt, DataType, Expr, FuncParam, FunctionDecl, Id, Literal, Stmt, VarDecl, VarPrefix}, lexer::Lexer, token::Tok, token::TokType};
 use std::iter::Peekable;
+use crate::ast::DataTypeLoc;
+use crate::token::Location;
 
 pub struct Parser<'a> {
     lexer: Peekable<Lexer<'a>>,
@@ -62,11 +64,11 @@ impl <'a> Parser<'a> {
         self.consume(TokType::CloseParent);
 
         // return type (optional)
-        let return_type = if let Some(Tok(TokType::Colon, _)) = self.lexer.peek() {
+        let return_type: DataTypeLoc = if let Some(Tok(TokType::Colon, _)) = self.lexer.peek() {
             self.consume(TokType::Colon);
-            FunctionType::Data(self.parse_data_type())
+            self.parse_data_type()
         } else {
-            FunctionType::Void
+            DataTypeLoc(DataType::Void, Location(0, 0))
         };
 
         // cmp stmt
@@ -109,7 +111,7 @@ impl <'a> Parser<'a> {
 
         // return stmt
         if let Some(tok) =  self.lexer.peek() {
-            match tok.0 {
+            return match tok.0 {
                 TokType::KwReturn => {
                     self.consume(TokType::KwReturn);
                     let expr: Option<Expr> = if self.check_peek_expr() {
@@ -118,16 +120,17 @@ impl <'a> Parser<'a> {
                         None
                     };
                     self.consume(TokType::SemiColon);
-                    return Stmt::ReturnStmt(expr);
+                    Stmt::ReturnStmt(expr)
                 },
                 TokType::KwLet | TokType::KwVar => {
                     let decl = self.parse_var();
-                    return Stmt::VarDeclStmt(decl);
+                    Stmt::VarDeclStmt(decl)
                 },
 
                 // if - else statement
                 TokType::KwIf => {
                     // parse condition
+                    self.consume_any();
                     let cond = self.parse_expr();
 
                     // parse else part
@@ -135,38 +138,21 @@ impl <'a> Parser<'a> {
 
                     // optional else part
                     let else_stmt: Option<CmpStmt> = if let Some(TokType::KwElse) = self.peek_typ() {
+                        self.consume_any();
                         Some(self.parse_cmp_stmt())
                     } else {
                         None
                     };
 
-                    return Stmt::IfElseStmt(cond, body, else_stmt)
-                }
-
-                // parse func call or variable assign
-                TokType::Iden(_) => {
-                    // assign or func call
-                    let id = self.parse_id();
-
-                    // check if open or assign
-                    match self.peek_typ() {
-                        Some(TokType::Assign) => {
-                            // parse assign statement
-                            self.consume(TokType::Assign);
-                            let expr = self.parse_expr();
-                            self.consume(TokType::SemiColon);
-                            return Stmt::AssignStmt(id, expr);
-                        },
-                        Some(TokType::OpenParent) => {
-                            // parse function call
-                            let stmt = Stmt::FuncCallStmt(self.parse_func_call(id));
-                            self.consume(TokType::SemiColon);
-                            return stmt;
-                        },
-                        _ => panic!("expected ( or = but actual: {:?}", self.lexer.peek())
-                    }
+                    Stmt::IfElseStmt(cond, body, else_stmt)
                 },
-                _ => panic!("unexpected token: {}", tok)
+
+                // expr
+                _ => {
+                    let expr = self.parse_expr();
+                    self.consume(TokType::SemiColon);
+                    Stmt::Expr(expr)
+                }
             }
         }
         
@@ -175,7 +161,12 @@ impl <'a> Parser<'a> {
 
     fn check_peek_expr(&mut self) -> bool {
         if let Some(Tok(typ, _)) = self.lexer.peek() {
-            matches!(typ, TokType::Iden(_) | TokType::IntConst(_) | TokType::KwTrue | TokType::KwFalse)
+            matches!(typ,
+                TokType::Iden(_)
+                | TokType::IntConst(_)
+                | TokType::KwTrue
+                | TokType::KwFalse
+            )
         } else {
             false
         }
@@ -186,19 +177,20 @@ impl <'a> Parser<'a> {
             match tok.0 {
                 TokType::Iden(_) => {
                     let id = self.parse_id();
-                    if let Some(TokType::OpenParent) = self.peek_typ() {
+                    match self.peek_typ() {
                         // parse func call
-                        Expr::FuncCall(self.parse_func_call(id))
-                    } else {
-                        debug!("parse var ref");
-                        // variable/param ref
-                        Expr::VarRefExpr(id)
+                        Some(TokType::OpenParent) => Expr::FuncCall(id, self.parse_args()),
+                        Some(TokType::Assign) => {
+                            self.consume_any();
+                            Expr::Assign(id, Box::new(self.parse_expr()))
+                        },
+                        _ => Expr::VarRef(id)
                     }
                 },
                 TokType::IntConst(_) => {
                     debug!("parse int const");
                     match self.lexer.next() {
-                        Some(Tok(TokType::IntConst(val), loc)) => Expr::LiteralExpr(Literal::Int(val, loc)),
+                        Some(Tok(TokType::IntConst(val), loc)) => Expr::Literal(Literal::Int(val, loc)),
                         Some(t) => panic!("expected number but {}", t),
                         _ => panic!("unexpected EOF")
                     }
@@ -207,8 +199,8 @@ impl <'a> Parser<'a> {
                     debug!("parse bool const");
                     match self.lexer.next() {
                         Some(tok) => match tok {
-                            Tok(TokType::KwTrue, loc) => Expr::LiteralExpr(Literal::Bool(true, loc)),
-                            Tok(TokType::KwFalse, loc) => Expr::LiteralExpr(Literal::Bool(false, loc)),
+                            Tok(TokType::KwTrue, loc) => Expr::Literal(Literal::Bool(true, loc)),
+                            Tok(TokType::KwFalse, loc) => Expr::Literal(Literal::Bool(false, loc)),
                             t => panic!("expected bool constant but {:?}", t)
                         }
                         _ => panic!("unexpected EOF")
@@ -221,7 +213,7 @@ impl <'a> Parser<'a> {
         }
     }
 
-    fn parse_func_call(&mut self, id: Id) -> FuncCallExpr {
+    fn parse_args(&mut self) -> Vec<Expr> {
 
         self.consume(TokType::OpenParent);
 
@@ -237,10 +229,7 @@ impl <'a> Parser<'a> {
 
         self.consume(TokType::CloseParent);
 
-        FuncCallExpr {
-            name: id,
-            args
-        }
+        args
     }
 
     fn parse_var(&mut self) -> VarDecl {
@@ -257,7 +246,7 @@ impl <'a> Parser<'a> {
         let name = self.parse_id();
 
         // option data type
-        let data_type: Option<DataType> = if let Some(Tok(TokType::Colon, _)) = self.lexer.peek() {
+        let data_type: Option<DataTypeLoc> = if let Some(Tok(TokType::Colon, _)) = self.lexer.peek() {
             self.consume(TokType::Colon);
             Some(self.parse_data_type())
         } else {
@@ -302,10 +291,10 @@ impl <'a> Parser<'a> {
         }
     }
 
-    fn parse_data_type(&mut self) -> DataType {
+    fn parse_data_type(&mut self) -> DataTypeLoc {
         match self.lexer.next() {
-            Some(Tok(TokType::KwInt, loc)) => DataType::Int(loc),
-            Some(Tok(TokType::KwBool, loc)) => DataType::Bool(loc),
+            Some(Tok(TokType::KwInt, loc)) => DataTypeLoc(DataType::Int, loc),
+            Some(Tok(TokType::KwBool, loc)) => DataTypeLoc(DataType::Bool, loc),
             Some(t) => panic!("expected int or bool but {}", t),
             None => panic!("unexpected EOF")
         }
@@ -313,7 +302,7 @@ impl <'a> Parser<'a> {
 
     fn consume(&mut self, typ: TokType) {
         match self.lexer.next() {
-            Some(t) if !t.is_typ(&typ) => panic!("expected {} but {}", typ, t),
+            Some(t) if !t.is_typ(&typ) => panic!("expected '{}' but '{}'", typ, t),
             Some(_) => {},
             None => panic!("unexpected EOF")
         }
@@ -356,14 +345,50 @@ mod tests {
         let main = ast.func_decls.first().unwrap();
         assert_eq!(main.name, Id("main".to_string(), Location(1, 4)));
         assert_eq!(main.params.len(), 0);
-        assert_eq!(main.return_type, FunctionType::Data(DataType::Int(Location(1, 12))));
+        assert_eq!(main.return_type, DataTypeLoc(DataType::Int, Location(1, 12)));
 
         // body
         let vec = &main.stmt.0;
         assert_eq!(vec.len(), 1);
         match vec.first().unwrap() {
-            Stmt::ReturnStmt(Some(Expr::LiteralExpr(Literal::Int(10, Location(1, 25))))) => {},
+            Stmt::ReturnStmt(Some(Expr::Literal(Literal::Int(10, Location(1, 25))))) => {},
             t => panic!("unexpected stmt: {:?}", t)
         }
+    }
+
+    #[test]
+    fn parse_valid_1() {
+        let ast = parse("fn main() { let x = false; x = true; } ");
+        assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 2);
+    }
+
+    #[test]
+    fn parse_valid_2() {
+        let ast = parse("fn foo() { let x = 0; let y = x = 2; let x = y; } ");
+        assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 3);
+    }
+
+    #[test]
+    fn parse_valid_3() {
+        let ast = parse("fn foo() { put(1); let x = put(2); let b = bar(); } ");
+        assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 3);
+    }
+
+    #[test]
+    fn parse_if_else() {
+        let ast = parse("fn foo() { if true { } else {} }");
+        assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 1);
+    }
+
+    #[test]
+    fn parse_if_else_1() {
+        let ast = parse("fn foo() { if true { if false {} else {} } } ");
+        assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 1);
+    }
+
+    #[test]
+    fn parse_if_else_2() {
+        let ast = parse("fn foo(a: bool): int { if a { let x: int = 1; } else { return 1; } return 0;  } ");
+        assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 2);
     }
 }

@@ -10,6 +10,8 @@ mod ast;
 mod token;
 mod parser;
 mod gen;
+mod semantic;
+mod ir;
 
 fn main() {
     env_logger::init();
