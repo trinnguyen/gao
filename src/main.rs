@@ -20,7 +20,7 @@ fn main() {
     env_logger::init();
     let file = std::env::args().nth(1).unwrap();
     let path = Path::new(&file);
-    let name= path.file_name().unwrap().to_str().unwrap();
+    let name= path.to_str().unwrap().to_string();
     let content = std::fs::read_to_string(path).unwrap();
 
     // start lexer

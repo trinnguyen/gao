@@ -33,7 +33,7 @@ pub enum TokType {
     Sub,
     Mul,
     Div,
-    Mod,
+    Rem,
 
     // unary
     Not,
@@ -94,7 +94,7 @@ impl Display for TokType {
             TokType::Sub => "-",
             TokType::Mul => "*",
             TokType::Div => "/",
-            TokType::Mod => "%",
+            TokType::Rem => "%",
             TokType::Not => "!",
         };
         write!(f, "{}", str)

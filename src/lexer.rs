@@ -73,7 +73,7 @@ impl<'a> Lexer<'a> {
 
                     '/' => TokType::Div,
 
-                    '%' => TokType::Mod,
+                    '%' => TokType::Rem,
 
                     '<' => match self.peek_char() {
                         Some('=') => {
@@ -350,7 +350,7 @@ mod tests {
             TokType::IntConst(4),
             TokType::Div,
             TokType::IntConst(5),
-            TokType::Mod,
+            TokType::Rem,
             TokType::IntConst(6),
         ];
         assert_eq!(actual, expected)

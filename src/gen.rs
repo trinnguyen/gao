@@ -1,14 +1,8 @@
 use std::collections::HashMap;
 
-use inkwell::{
-    builder::Builder,
-    context::Context,
-    module::Module,
-    types::{BasicType, BasicTypeEnum, IntType},
-    values::{BasicValue, BasicValueEnum, FunctionValue, IntValue, PointerValue},
-};
+use inkwell::{builder::Builder, context::Context, module::Module, types::{BasicType, BasicTypeEnum}, values::{BasicValue, BasicValueEnum, FunctionValue, IntValue, PointerValue}, IntPredicate};
 
-use crate::ast::{Ast, DataType, Expr, FunctionDecl, Literal, Stmt, VarDecl, Id, DataTypeLoc, BinOp};
+use crate::ast::{Ast, DataType, Expr, FunctionDecl, Literal, Stmt, VarDecl, Id, DataTypeLoc, BinOp, UnaryOp};
 
 pub struct LlvmGen<'a> {
     ast: &'a Ast,
@@ -154,8 +148,40 @@ impl<'a> LlvmGen<'a> {
             }
             Expr::FuncCall(id, args) => self.gen_func_call(id, args),
             Expr::Assign(id, expr) => self.gen_assign(id, expr),
-            Expr::BinOpExpr(lhs, op, rhs) => todo!(),
-            Expr::Unary(op, body) => todo!()
+            Expr::BinOpExpr(lhs, op, rhs) => self.gen_op_expr(lhs, op, rhs),
+            Expr::Unary(op, body) => match op {
+                UnaryOp::Not => panic!("not op is not yet supported"),
+                UnaryOp::Sub => {
+                    let rval = self.gen_expr(body).into_int_value();
+                    self.builder.build_int_sub(self.ctx.i32_type().const_zero(), rval, "tmpunary").as_basic_value_enum()
+                }
+            }
+        }
+    }
+
+    fn gen_op_expr(&self, lhs: &Expr, op: &BinOp, rhs: &Expr) -> BasicValueEnum<'a> {
+
+        let lval = self.gen_expr(lhs).into_int_value();
+        let rval = self.gen_expr(rhs).into_int_value();
+
+        // int
+        match op {
+            // arith
+            BinOp::Add => self.builder.build_int_add(lval, rval, "tmpadd").as_basic_value_enum(),
+            BinOp::Sub => self.builder.build_int_sub(lval, rval, "tmpsub").as_basic_value_enum(),
+            BinOp::Mul => self.builder.build_int_mul(lval, rval, "tmpmul").as_basic_value_enum(),
+            BinOp::Div => self.builder.build_int_signed_div(lval, rval, "tmpdiv").as_basic_value_enum(),
+            BinOp::Rem => self.builder.build_int_signed_rem(lval, rval, "tmprem").as_basic_value_enum(),
+
+            BinOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, lval, rval, "tmpgt").as_basic_value_enum(),
+            BinOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, lval, rval, "tmplt").as_basic_value_enum(),
+            BinOp::Ge => self.builder.build_int_compare(IntPredicate::SGE, lval, rval, "tmpge").as_basic_value_enum(),
+            BinOp::Le => self.builder.build_int_compare(IntPredicate::SLE, lval, rval, "tmple").as_basic_value_enum(),
+
+            BinOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, lval, rval, "tmpeq").as_basic_value_enum(),
+            BinOp::Neq => self.builder.build_int_compare(IntPredicate::NE, lval, rval, "tmpne").as_basic_value_enum(),
+
+            BinOp::Or | BinOp::And => panic!("And and Or must be converted to basic blocs, not handled by code-gen")
         }
     }
 

@@ -255,7 +255,7 @@ impl <'a> Parser<'a> {
             let op = match tok {
                 TokType::Mul => BinOp::Mul,
                 TokType::Div => BinOp::Div,
-                TokType::Mod => BinOp::Mod,
+                TokType::Rem => BinOp::Rem,
                 _ => break
             };
             self.consume_any();

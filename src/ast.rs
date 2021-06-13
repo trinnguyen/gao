@@ -95,7 +95,21 @@ pub enum BinOp {
     Sub,
     Mul,
     Div,
-    Mod,
+    Rem,
+}
+
+impl BinOp {
+    pub fn is_arith(&self) -> bool {
+        matches!(self, BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem )
+    }
+
+    pub fn is_arith_compare(&self) -> bool {
+        matches!(self, BinOp::Gt | BinOp::Lt | BinOp::Ge | BinOp::Le )
+    }
+
+    pub fn is_logic(&self) -> bool {
+        matches!(self, BinOp::And | BinOp::Or )
+    }
 }
 
 #[derive(Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
