@@ -1,12 +1,16 @@
-use log::{debug};
+use log::{debug,info};
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use inkwell::context::Context;
 use parser::Parser;
 
 use crate::{gen::LlvmGen, lexer::Lexer};
 use clap::{App, Arg};
+use inkwell::targets::{TargetMachine, Target, InitializationConfig, RelocMode, CodeModel, FileType};
+use inkwell::module::Module;
+use inkwell::OptimizationLevel;
+use std::process::Command;
 
 mod lexer;
 mod ast;
@@ -64,15 +68,56 @@ fn main() {
 
     // run jit
     if cli_matches.is_present("run") {
-        // check if having main func
-        if module.get_function("main").is_some() {
-            let res = jit::execute_jit(module);
-            debug!("Exit code: {}", res);
-            std::process::exit(res);
-        } else {
-            debug!("No main found, ignored JIT run")
-        }
+        run_jit(module);
+        return;
     }
+
+    compile_to_obj(module, path);
+}
+
+fn run_jit(module: &Module) {
+    info!("Invoke JIT");
+    // check if having main func
+    if module.get_function("main").is_some() {
+        let res = jit::execute_jit(module);
+        debug!("Exit code: {}", res);
+        std::process::exit(res);
+    } else {
+        debug!("No main found, ignored JIT run")
+    }
+}
+
+fn compile_to_obj(module: &Module, path: &Path) -> PathBuf {
+
+    // compile to object file
+    let triple = TargetMachine::get_default_triple();
+    info!("Tripple: {:?}", triple);
+    module.set_triple(&triple);
+
+    // init
+    Target::initialize_native(&InitializationConfig::default()).unwrap();
+    let target = Target::from_triple(&triple).unwrap();
+    info!("Target: {:?}", target);
+    let tm = target.create_target_machine(
+        &triple,
+        TargetMachine::get_host_cpu_name().to_string().as_str(),
+        TargetMachine::get_host_cpu_features().to_string().as_str(),
+        OptimizationLevel::None,
+        RelocMode::Default,
+        CodeModel::Default
+    ).unwrap();
+    module.set_data_layout(&tm.get_target_data().get_data_layout());
+
+    // write asm
+    let pasm = path.with_extension("s");
+    tm.write_to_file(module, FileType::Assembly, &pasm).unwrap();
+    debug!("wrote to file {:?}", &pasm);
+
+    // write obj
+    let pobj = path.with_extension("o");
+    tm.write_to_file(module, FileType::Object, &pobj).unwrap();
+    debug!("wrote to file {:?}", &pobj);
+    pobj
 }
 
 fn write_file(content: &str, path: &Path, ext: &str) {
