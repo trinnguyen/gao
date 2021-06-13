@@ -1,6 +1,6 @@
 use log::debug;
 
-use crate::token::Location;
+use crate::core::Location;
 use crate::token::{Tok, TokType};
 use std::str::Chars;
 use std::iter::Peekable;
@@ -32,7 +32,57 @@ impl<'a> Lexer<'a> {
                     ',' => TokType::Comma,
                     ';' => TokType::SemiColon,
                     ':' => TokType::Colon,
-                    '=' => TokType::Assign,
+                    '=' => match self.peek_char() {
+                        Some('=') => {
+                            self.consume_any();
+                            TokType::Eq
+                        },
+                        _ => TokType::Assign,
+                    },
+
+                    // expression operator
+                    '|' => match self.next_char() {
+                        Some('|') => TokType::Or,
+                        _ => panic!("expected '|'")
+                    },
+                    '&' => match self.next_char() {
+                        Some('&') => TokType::And,
+                        _ => panic!("expected '&'")
+                    },
+                    '!' => match self.peek_char() {
+                        Some('=') => {
+                            self.consume_any();
+                            TokType::Neq
+                        },
+                        _ => TokType::Not
+                    },
+
+                    '>' => match self.peek_char() {
+                        Some('=') => {
+                            self.consume_any();
+                            TokType::Ge
+                        },
+                        _ => TokType::Gt
+                    },
+
+                    '+' => TokType::Add,
+
+                    '-' => TokType::Sub,
+
+                    '*' => TokType::Mul,
+
+                    '/' => TokType::Div,
+
+                    '%' => TokType::Mod,
+
+                    '<' => match self.peek_char() {
+                        Some('=') => {
+                            self.consume_any();
+                            TokType::Le
+                        },
+                        _ => TokType::Lt
+                    }
+
                     t if t.is_ascii_alphabetic() => self.scan_keyword_or_id(t),
                     t if t.is_ascii_digit() => self.scan_int_const(t),
                     t => panic!("unexpected char: {} at {}", t, self.location())
@@ -56,6 +106,14 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn peek_char(&mut self) -> Option<&char> {
+        self.str.peek()
+    }
+
+    fn consume_any(&mut self) {
+        self.next_char();
+    }
+
     fn next_char(&mut self) -> Option<char> {
         match self.str.next() {
             Some(c) => {
@@ -68,7 +126,7 @@ impl<'a> Lexer<'a> {
                         self.col += 1;
                     }
                 }
-                return Some(c);
+                Some(c)
             }
             None => None,
         }
@@ -264,6 +322,68 @@ mod tests {
         let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
         let expected = vec![
             TokType::Iden("main12".to_string()),
+        ];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_op_addsub() {
+        let lexer = Lexer::new("3 + 4 - 5");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::IntConst(3),
+            TokType::Add,
+            TokType::IntConst(4),
+            TokType::Sub,
+            TokType::IntConst(5),
+        ];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_op_muldiv() {
+        let lexer = Lexer::new("3 * 4 / 5 % 6");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::IntConst(3),
+            TokType::Mul,
+            TokType::IntConst(4),
+            TokType::Div,
+            TokType::IntConst(5),
+            TokType::Mod,
+            TokType::IntConst(6),
+        ];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_op_logic() {
+        let lexer = Lexer::new("a && b || c && !d");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::Iden("a".to_string()),
+            TokType::And,
+            TokType::Iden("b".to_string()),
+            TokType::Or,
+            TokType::Iden("c".to_string()),
+            TokType::And,
+            TokType::Not,
+            TokType::Iden("d".to_string()),
+        ];
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_op_eq() {
+        let lexer = Lexer::new("> >= <= < == !=");
+        let actual: Vec<TokType> = lexer.map(|t| t.0).collect();
+        let expected = vec![
+            TokType::Gt,
+            TokType::Ge,
+            TokType::Le,
+            TokType::Lt,
+            TokType::Eq,
+            TokType::Neq,
         ];
         assert_eq!(actual, expected)
     }

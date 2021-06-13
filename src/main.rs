@@ -1,3 +1,5 @@
+use log::{debug};
+
 use std::path::Path;
 
 use inkwell::context::Context;
@@ -12,19 +14,22 @@ mod parser;
 mod gen;
 mod semantic;
 mod ir;
+mod core;
 
 fn main() {
     env_logger::init();
-    let file = std::env::args().skip(1).next().unwrap();
+    let file = std::env::args().nth(1).unwrap();
     let path = Path::new(&file);
     let name= path.file_name().unwrap().to_str().unwrap();
     let content = std::fs::read_to_string(path).unwrap();
+
+    // start lexer
     let lexer = Lexer::new(&content);
 
     // parse
     let mut parser = Parser::new(lexer);
     let ast = parser.parse(name.to_string());
-    println!("{:?}", ast);
+    write_file(&serde_yaml::to_string(&ast).unwrap(), path, "yml");
 
     // gen
     let context = Context::create();
@@ -32,7 +37,11 @@ fn main() {
     let val = gen.build();
 
     // lli
-    println!("{}", val);
-    let ll_path = path.with_extension("ll");
-    std::fs::write(&ll_path, val).unwrap();
+    write_file(&val, path, "ll");
+}
+
+fn write_file(content: &str, path: &Path, ext: &str) {
+    let new_path = path.with_extension(ext);
+    std::fs::write(&new_path, content).unwrap();
+    debug!("wrote to file {:?}", &new_path);
 }

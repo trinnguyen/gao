@@ -1,19 +1,13 @@
 use std::{fmt::Display, usize};
+use serde::{Serialize, Deserialize, Serializer};
+use crate::core::Location;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tok(pub TokType, pub Location);
 
-impl Tok {
-    pub fn is_typ(&self, typ: &TokType) -> bool {
-        return self.0 == *typ;
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
-pub struct Location(pub usize, pub usize);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TokType {
+
     // keyword
     KwFn,
     KwInt,
@@ -25,6 +19,24 @@ pub enum TokType {
     KwFalse,
     KwIf,
     KwElse,
+
+    // expression operator
+    Or,
+    And,
+    Eq,
+    Neq,
+    Gt,
+    Lt,
+    Ge,
+    Le,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+
+    // unary
+    Not,
 
     // symbols
     OpenParent,
@@ -44,12 +56,6 @@ pub enum TokType {
 impl Display for Tok {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} at {}", self.0, self.1)
-    }
-}
-
-impl Display for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.0, self.1)
     }
 }
 
@@ -75,7 +81,21 @@ impl Display for TokType {
             TokType::Colon => ":",
             TokType::Assign => "=",
             TokType::Iden(id) => id,
-            TokType::IntConst(num) => return write!(f, "{}", num)
+            TokType::IntConst(num) => return write!(f, "{}", num),
+            TokType::Or => "||",
+            TokType::And => "&&",
+            TokType::Eq => "==",
+            TokType::Neq => "!=",
+            TokType::Gt => ">",
+            TokType::Lt => "<",
+            TokType::Ge => ">=",
+            TokType::Le => "<=",
+            TokType::Add => "+",
+            TokType::Sub => "-",
+            TokType::Mul => "*",
+            TokType::Div => "/",
+            TokType::Mod => "%",
+            TokType::Not => "!",
         };
         write!(f, "{}", str)
     }

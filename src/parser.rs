@@ -1,8 +1,9 @@
 use log::{debug};
 use crate::{ast::{Ast, CmpStmt, DataType, Expr, FuncParam, FunctionDecl, Id, Literal, Stmt, VarDecl, VarPrefix}, lexer::Lexer, token::Tok, token::TokType};
 use std::iter::Peekable;
-use crate::ast::DataTypeLoc;
-use crate::token::Location;
+use crate::ast::{DataTypeLoc, UnaryOp, BinOp};
+use crate::core::Location;
+use crate::ast::Expr::Unary;
 
 pub struct Parser<'a> {
     lexer: Peekable<Lexer<'a>>,
@@ -173,8 +174,113 @@ impl <'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Expr {
+        self.parse_or_expr()
+    }
+
+    fn parse_or_expr(&mut self) -> Expr {
+        let mut lhs = self.parse_and_expr();
+        while let Some(TokType::Or) = self.peek_typ() {
+            self.consume_any();
+            let rhs = self.parse_and_expr();
+            lhs = Expr::BinOpExpr(Box::new(lhs), BinOp::Or, Box::new(rhs))
+        }
+
+        lhs
+    }
+
+    fn parse_and_expr(&mut self) -> Expr {
+        let mut lhs = self.parse_equality_expr();
+        while let Some(TokType::And) = self.peek_typ() {
+            self.consume_any();
+            let rhs = self.parse_equality_expr();
+            lhs = Expr::BinOpExpr(Box::new(lhs), BinOp::And, Box::new(rhs))
+        }
+
+        lhs
+    }
+
+    fn parse_equality_expr(&mut self) -> Expr {
+        let mut lhs = self.parse_relational_expr();
+        while let Some(tok) = self.peek_typ() {
+            let op = match tok {
+                TokType::Eq => BinOp::Eq,
+                TokType::Neq => BinOp::Neq,
+                _ => break
+            };
+            self.consume_any();
+            let rhs = self.parse_relational_expr();
+            lhs = Expr::BinOpExpr(Box::new(lhs), op, Box::new(rhs))
+        }
+
+        lhs
+    }
+
+    fn parse_relational_expr(&mut self) -> Expr {
+        let mut lhs = self.parse_addsub_expr();
+        while let Some(tok) = self.peek_typ() {
+            let op = match tok {
+                TokType::Gt => BinOp::Gt,
+                TokType::Ge => BinOp::Ge,
+                TokType::Lt => BinOp::Lt,
+                TokType::Le => BinOp::Le,
+                _ => break
+            };
+            self.consume_any();
+            let rhs = self.parse_addsub_expr();
+            lhs = Expr::BinOpExpr(Box::new(lhs), op, Box::new(rhs))
+        }
+
+        lhs
+    }
+
+    fn parse_addsub_expr(&mut self) -> Expr {
+        let mut lhs = self.parse_muldiv_expr();
+        while let Some(tok) = self.peek_typ() {
+            let op = match tok {
+                TokType::Add => BinOp::Add,
+                TokType::Sub => BinOp::Sub,
+                _ => break
+            };
+            self.consume_any();
+            let rhs = self.parse_muldiv_expr();
+            lhs = Expr::BinOpExpr(Box::new(lhs), op, Box::new(rhs))
+        }
+
+        lhs
+    }
+
+    fn parse_muldiv_expr(&mut self) -> Expr {
+        let mut lhs = self.parse_primary();
+        while let Some(tok) = self.peek_typ() {
+            let op = match tok {
+                TokType::Mul => BinOp::Mul,
+                TokType::Div => BinOp::Div,
+                TokType::Mod => BinOp::Mod,
+                _ => break
+            };
+            self.consume_any();
+            let rhs = self.parse_primary();
+            lhs = Expr::BinOpExpr(Box::new(lhs), op, Box::new(rhs))
+        }
+
+        lhs
+    }
+
+    fn parse_primary(&mut self) -> Expr {
         if let Some(tok) = self.lexer.peek() {
             match tok.0 {
+
+                TokType::Not | TokType::Sub => {
+                    // parse unary
+                    let typ = self.lexer.next().unwrap().0;
+                    let op = match typ {
+                        TokType::Not => UnaryOp::Not,
+                        _ => UnaryOp::Sub
+                    };
+                    let expr = self.parse_primary();
+                    Expr::Unary(op, Box::new(expr))
+                }
+
                 TokType::Iden(_) => {
                     let id = self.parse_id();
                     match self.peek_typ() {
@@ -186,7 +292,8 @@ impl <'a> Parser<'a> {
                         },
                         _ => Expr::VarRef(id)
                     }
-                },
+                }
+
                 TokType::IntConst(_) => {
                     debug!("parse int const");
                     match self.lexer.next() {
@@ -194,7 +301,8 @@ impl <'a> Parser<'a> {
                         Some(t) => panic!("expected number but {}", t),
                         _ => panic!("unexpected EOF")
                     }
-                },
+                }
+
                 TokType::KwTrue | TokType::KwFalse => {
                     debug!("parse bool const");
                     match self.lexer.next() {
@@ -205,7 +313,15 @@ impl <'a> Parser<'a> {
                         }
                         _ => panic!("unexpected EOF")
                     }
-                },
+                }
+
+                TokType::OpenParent => {
+                    self.consume_any();
+                    let expr = self.parse_expr();
+                    self.consume(TokType::CloseParent);
+                    expr
+                }
+
                 _ => panic!("expected expr but {}", tok)
             }
         } else {
@@ -302,7 +418,7 @@ impl <'a> Parser<'a> {
 
     fn consume(&mut self, typ: TokType) {
         match self.lexer.next() {
-            Some(t) if !t.is_typ(&typ) => panic!("expected '{}' but '{}'", typ, t),
+            Some(t) if t.0 != typ => panic!("expected '{}' but '{}'", typ, t),
             Some(_) => {},
             None => panic!("unexpected EOF")
         }
@@ -322,7 +438,7 @@ mod tests {
     use crate::parser::Parser;
     use crate::lexer::Lexer;
     use crate::ast::*;
-    use crate::token::Location;
+    use crate::core::Location;
 
     fn parse(str: &str) -> Ast {
         let lexer = Lexer::new(str);
@@ -390,5 +506,24 @@ mod tests {
     fn parse_if_else_2() {
         let ast = parse("fn foo(a: bool): int { if a { let x: int = 1; } else { return 1; } return 0;  } ");
         assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 2);
+    }
+
+    #[test]
+    fn parse_or() {
+        let ast = parse("fn foo() { let x: bool = true || false; }");
+        assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 1);
+    }
+
+    #[test]
+    fn parse_expr() {
+        let src = "fn main() {
+    let x = -1 + 2 - 4 * 5 / 6 % 7;
+    let x1 = -(1+2);
+    let y = !a && b || c;
+    let c = 1 >= 2 == 1 > 2;
+    let d = 1 < 2 != 1 <= 2;
+}";
+        let ast = parse(src);
+        assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 5);
     }
 }

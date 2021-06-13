@@ -14,5 +14,3 @@ Cargo.lock
 **/.idea
 
 .samples
-
-*.ll

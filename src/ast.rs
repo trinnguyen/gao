@@ -1,15 +1,16 @@
 use std::fmt::Display;
+use serde::{Serialize, Deserialize};
 
-use crate::token::Location;
+use crate::core::Location;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Ast {
     pub name: String,
     pub var_decls: Vec<VarDecl>,
     pub func_decls: Vec<FunctionDecl>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VarDecl {
     pub prefix: VarPrefix,
     pub name: Id,
@@ -17,13 +18,13 @@ pub struct VarDecl {
     pub init_value: Expr
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum VarPrefix {
     Let(Location),
     Var(Location)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FunctionDecl {
     pub name: Id,
     pub params: Vec<FuncParam>,
@@ -31,10 +32,10 @@ pub struct FunctionDecl {
     pub stmt: CmpStmt
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CmpStmt(pub Vec<Stmt>, pub Location);
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Stmt {
     // return an expr or empty
     ReturnStmt(Option<Expr>),
@@ -49,41 +50,66 @@ pub enum Stmt {
     Expr(Expr)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Expr {
     Literal(Literal),
     VarRef(Id),
     Assign(Id, Box<Expr>),
-    FuncCall(Id, Vec<Expr>)
+    FuncCall(Id, Vec<Expr>),
+    BinOpExpr(Box<Expr>, BinOp, Box<Expr>),
+    Unary(UnaryOp, Box<Expr>)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
+pub enum UnaryOp {
+    Not,
+    Sub
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Literal {
     Int(u32, Location),
     Bool(bool, Location)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FuncParam {
     pub name: Id,
     pub data_type: DataTypeLoc
 }
 
-#[derive(Debug, PartialOrd, PartialEq)]
+#[derive(Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
 pub struct Id(pub String, pub Location);
+
+#[derive(Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
+pub enum BinOp {
+    Or,
+    And,
+    Eq,
+    Neq,
+    Gt,
+    Lt,
+    Ge,
+    Le,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+}
+
+#[derive(Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
+pub struct DataTypeLoc(pub DataType, pub Location);
+
+#[derive(Debug, PartialOrd, PartialEq, Serialize, Deserialize)]
+pub enum DataType {
+    Int,
+    Bool,
+    Void
+}
 
 impl Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} at {}", self.0, self.1)
     }
-}
-
-#[derive(Debug, PartialOrd, PartialEq)]
-pub struct DataTypeLoc(pub DataType, pub Location);
-
-#[derive(Debug, PartialOrd, PartialEq)]
-pub enum DataType {
-    Int,
-    Bool,
-    Void
 }

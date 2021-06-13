@@ -1,5 +1,5 @@
 use crate::ast::{VarPrefix, Id, Expr};
-use crate::token::Location;
+use crate::core::Location;
 
 pub struct Prog {
     pub name: String,

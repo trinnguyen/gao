@@ -26,7 +26,25 @@ varPrefix: 'let' | 'var';
 
 data_type: 'int' | 'bool';
 
-expr: literalExpr | refExpr | funcCallExpr;
+expr: logicOrExpr;
+
+logicOrExpr: logicAndExpr ('||' logicAndExpr)*;
+
+logicAndExpr: equalityExpr ('&&' equalityExpr)*;
+
+equalityExpr: relationalExpr (('==' | '!=') relationalExpr)*;
+
+relationalExpr: addSubExpr (('<' | '>' | '<=' | '>=') addSubExpr)*;
+
+addSubExpr: mulDivExpr (('+' | '-') mulDivExpr)*;
+
+mulDivExpr: primaryExpr (('*' | '/' | '%') primaryExpr)*;
+
+primaryExpr: unaryExpr | groupExpr | literalExpr | refExpr | funcCallExpr;
+
+unaryExpr: ('!' | '-') primaryExpr;
+
+groupExpr: '(' expr ')';
 
 literalExpr: intLiteral | boolLiteral;
 

@@ -8,7 +8,7 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum, FunctionValue, IntValue, PointerValue},
 };
 
-use crate::ast::{Ast, DataType, Expr, FunctionDecl, Literal, Stmt, VarDecl, Id, DataTypeLoc};
+use crate::ast::{Ast, DataType, Expr, FunctionDecl, Literal, Stmt, VarDecl, Id, DataTypeLoc, BinOp};
 
 pub struct LlvmGen<'a> {
     ast: &'a Ast,
@@ -153,7 +153,9 @@ impl<'a> LlvmGen<'a> {
                 }
             }
             Expr::FuncCall(id, args) => self.gen_func_call(id, args),
-            Expr::Assign(id, expr) => self.gen_assign(id, expr)
+            Expr::Assign(id, expr) => self.gen_assign(id, expr),
+            Expr::BinOpExpr(lhs, op, rhs) => todo!(),
+            Expr::Unary(op, body) => todo!()
         }
     }
 
