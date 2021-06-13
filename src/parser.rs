@@ -163,10 +163,13 @@ impl <'a> Parser<'a> {
     fn check_peek_expr(&mut self) -> bool {
         if let Some(Tok(typ, _)) = self.lexer.peek() {
             matches!(typ,
-                TokType::Iden(_)
-                | TokType::IntConst(_)
-                | TokType::KwTrue
-                | TokType::KwFalse
+                TokType::Iden(_) // fun call, var ref
+                | TokType::IntConst(_) // literal
+                | TokType::KwTrue // literal
+                | TokType::KwFalse // literal
+                | TokType::Not // unary
+                | TokType::Sub // unary
+                | TokType::OpenParent // unary
             )
         } else {
             false
@@ -525,5 +528,20 @@ mod tests {
 }";
         let ast = parse(src);
         assert_eq!(ast.func_decls.first().unwrap().stmt.0.len(), 5);
+    }
+
+    #[test]
+    fn parse_expr_2() {
+        let _ = parse("fn main(): int { return -1; }");
+    }
+
+    #[test]
+    fn parse_expr_3() {
+        let _ = parse("fn main(): bool { return !false; }");
+    }
+
+    #[test]
+    fn parse_expr_4() {
+        let _ = parse("fn main(): int { return (2 + 3) * 4; } ");
     }
 }

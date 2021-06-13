@@ -27,7 +27,7 @@ impl<'a> LlvmGen<'a> {
         }
     }
 
-    pub fn build(&mut self) -> String {
+    pub fn build(&mut self) -> &Module<'a> {
         // go through
         for val_decl in &self.ast.var_decls {
             self.gen_global_var(val_decl);
@@ -43,8 +43,8 @@ impl<'a> LlvmGen<'a> {
             self.gen_func(func_decl);
         }
 
-        // to string
-        self.module.print_to_string().to_string()
+        // return
+        &self.module
     }
 
     fn gen_global_var(&self, decl: &VarDecl) {
@@ -238,7 +238,7 @@ mod tests {
         let ast = Parser::new(lexer).parse("test".to_string());
         let ctx = Context::create();
         let mut gen = LlvmGen::new(&ast, &ctx);
-        gen.build()
+        gen.build().print_to_string().to_string()
     }
 
     #[test]
