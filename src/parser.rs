@@ -181,89 +181,64 @@ impl <'a> Parser<'a> {
     }
 
     fn parse_or_expr(&mut self) -> Expr {
-        let mut lhs = self.parse_and_expr();
-        while let Some(TokType::Or) = self.peek_typ() {
-            self.consume_any();
-            let rhs = self.parse_and_expr();
-            lhs = Expr::BinOpExpr(Box::new(lhs), BinOp::Or, Box::new(rhs))
-        }
-
-        lhs
+        self.parse_op_expr(|op| match op {
+            TokType::Or => Some(BinOp::Or),
+            _ => None
+        }, |parser| parser.parse_and_expr())
     }
 
     fn parse_and_expr(&mut self) -> Expr {
-        let mut lhs = self.parse_equality_expr();
-        while let Some(TokType::And) = self.peek_typ() {
-            self.consume_any();
-            let rhs = self.parse_equality_expr();
-            lhs = Expr::BinOpExpr(Box::new(lhs), BinOp::And, Box::new(rhs))
-        }
-
-        lhs
+        self.parse_op_expr(|op| match op {
+            TokType::And => Some(BinOp::And),
+            _ => None
+        }, |parser| parser.parse_equality_expr())
     }
 
     fn parse_equality_expr(&mut self) -> Expr {
-        let mut lhs = self.parse_relational_expr();
-        while let Some(tok) = self.peek_typ() {
-            let op = match tok {
-                TokType::Eq => BinOp::Eq,
-                TokType::Neq => BinOp::Neq,
-                _ => break
-            };
-            self.consume_any();
-            let rhs = self.parse_relational_expr();
-            lhs = Expr::BinOpExpr(Box::new(lhs), op, Box::new(rhs))
-        }
-
-        lhs
+        self.parse_op_expr(|op| match op {
+            TokType::Eq => Some(BinOp::Eq),
+            TokType::Neq => Some(BinOp::Neq),
+            _ => None
+        }, |parser| parser.parse_relational_expr())
     }
 
     fn parse_relational_expr(&mut self) -> Expr {
-        let mut lhs = self.parse_addsub_expr();
-        while let Some(tok) = self.peek_typ() {
-            let op = match tok {
-                TokType::Gt => BinOp::Gt,
-                TokType::Ge => BinOp::Ge,
-                TokType::Lt => BinOp::Lt,
-                TokType::Le => BinOp::Le,
-                _ => break
-            };
-            self.consume_any();
-            let rhs = self.parse_addsub_expr();
-            lhs = Expr::BinOpExpr(Box::new(lhs), op, Box::new(rhs))
-        }
-
-        lhs
+        self.parse_op_expr(|op| match op {
+            TokType::Gt => Some(BinOp::Gt),
+            TokType::Ge => Some(BinOp::Ge),
+            TokType::Lt => Some(BinOp::Lt),
+            TokType::Le => Some(BinOp::Le),
+            _ => None
+        }, |parser| parser.parse_addsub_expr())
     }
 
     fn parse_addsub_expr(&mut self) -> Expr {
-        let mut lhs = self.parse_muldiv_expr();
-        while let Some(tok) = self.peek_typ() {
-            let op = match tok {
-                TokType::Add => BinOp::Add,
-                TokType::Sub => BinOp::Sub,
-                _ => break
-            };
-            self.consume_any();
-            let rhs = self.parse_muldiv_expr();
-            lhs = Expr::BinOpExpr(Box::new(lhs), op, Box::new(rhs))
-        }
-
-        lhs
+        self.parse_op_expr(|op| match op {
+            TokType::Add => Some(BinOp::Add),
+            TokType::Sub => Some(BinOp::Sub),
+            _ => None
+        }, |parser| parser.parse_muldiv_expr())
     }
 
     fn parse_muldiv_expr(&mut self) -> Expr {
-        let mut lhs = self.parse_primary();
+        self.parse_op_expr(|op| match op {
+            TokType::Mul => Some(BinOp::Mul),
+            TokType::Div => Some(BinOp::Div),
+            TokType::Rem => Some(BinOp::Rem),
+            _ => None
+        }, |parser| parser.parse_primary())
+    }
+
+    fn parse_op_expr<F, P>(&mut self, op_to_bin: F, term_fn: P) -> Expr where F: Fn(&TokType) -> Option<BinOp>, P: Fn(&mut Parser) -> Expr {
+        let mut lhs = term_fn(self);
         while let Some(tok) = self.peek_typ() {
-            let op = match tok {
-                TokType::Mul => BinOp::Mul,
-                TokType::Div => BinOp::Div,
-                TokType::Rem => BinOp::Rem,
-                _ => break
-            };
-            self.consume_any();
-            let rhs = self.parse_primary();
-            lhs = Expr::BinOpExpr(Box::new(lhs), op, Box::new(rhs))
+            if let Some(op) = op_to_bin(tok) {
+                self.consume_any();
+                let rhs = term_fn(self);
+                lhs = Expr::BinOpExpr(Box::new(lhs), op, Box::new(rhs))
+            } else {
+                break
+            }
         }
 
         lhs
